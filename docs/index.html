@@ -28,10 +28,25 @@ h1{font-size:20px;font-weight:700}
 .zoom-row.visible{display:flex}
 .zoom-row input[type=range]{flex:1;accent-color:#fe2c55}
 
-.pi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:300px;font-size:12px;color:rgba(255,255,255,.5);background:#1a1a1a;border-radius:10px;padding:10px 12px}
-.pi-row .pi-left{display:flex;align-items:center;gap:8px}
-.pi-row input[type=checkbox]{width:16px;height:16px}
+.pi-row,.float-row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:300px;font-size:12px;color:rgba(255,255,255,.5);background:#1a1a1a;border-radius:10px;padding:10px 12px}
+.pi-row .pi-left,.float-row .pi-left{display:flex;align-items:center;gap:8px}
+.pi-row input[type=checkbox],.float-row input[type=checkbox]{width:16px;height:16px}
 .pi-row input[type=text]{width:48px;background:#2a2a2a;border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;padding:5px 6px;font-size:12px;text-align:center}
+
+/* ===== プレビュー内の誘導ダイアログ(見た目確認用。実際のサイトは常時表示) ===== */
+.p-ov{position:absolute;inset:0;background:rgba(0,0,0,0.514);z-index:3001;display:none;align-items:center;justify-content:center;padding:0 16px}
+.p-ov.visible{display:flex}
+.p-mc{background:#fff;border-radius:10px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,0.3)}
+.p-mb{padding:20px 18px 0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px}
+.p-mi{width:47px;height:47px;border-radius:11px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer;background:#f2f2f2;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(0,0,0,.35);text-align:center;position:relative}
+.p-mi img{width:100%;height:100%;object-fit:cover;display:block}
+.p-mi .p-mi-badge{position:absolute;inset:0;background:rgba(0,0,0,.45);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+.p-mi:hover .p-mi-badge{opacity:1}
+.p-mt{font-size:13px;font-weight:700;color:#161823;line-height:1.35}
+.p-md{font-size:10px;color:rgba(22,24,35,.7);line-height:1.5}
+.p-ma{padding:14px 16px 17px;display:flex;flex-direction:column;align-items:center}
+.p-bo{display:block;width:100%;padding:10px 0;background:#fe2c55;color:#fff;font-size:12.5px;font-weight:700;border-radius:4px;text-align:center}
+.p-bl{display:block;width:100%;padding:9px 0 0;color:rgba(22,24,35,.55);font-size:11.5px;text-align:center}
 
 .rail{position:absolute;right:8px;bottom:62px;display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10}
 .rail-avatar{position:relative;display:block;width:38px;height:38px;cursor:pointer}
@@ -171,10 +186,34 @@ input.missing{border-color:#fe2c55}
             <span class="nav-label">プロフィール</span>
           </div>
         </div>
+
+        <div class="p-ov" id="floatPreview">
+          <div class="p-mc">
+            <div class="p-mb">
+              <div class="p-mi" id="previewIconArea">
+                <span id="previewIconPlaceholder">＋</span>
+                <img id="previewIconImg" style="display:none" alt="">
+                <div class="p-mi-badge">変更</div>
+              </div>
+              <p class="p-mt">アプリで全機能をお試しください</p>
+              <p class="p-md">アプリでさらに多くの動画と優れた機能をお楽しみください</p>
+            </div>
+            <div class="p-ma">
+              <div class="p-bo">TikTokを開く</div>
+              <div class="p-bl">後で</div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="zoom-row" id="zoomRow">
         <span>ズーム</span>
         <input type="range" id="zoomSlider" min="1" max="4" step="0.01" value="1">
+      </div>
+      <div class="float-row">
+        <div class="pi-left">
+          <input type="checkbox" id="floatToggle">
+          <label for="floatToggle">誘導ダイアログをプレビュー表示</label>
+        </div>
       </div>
       <div class="pi-row">
         <div class="pi-left">
@@ -307,6 +346,7 @@ function saveState() {
     shareCount: document.getElementById('shareCount').textContent.trim(),
     piToggle: piToggle.checked,
     piCount: piCount.value,
+    floatToggle: floatToggle.checked,
     bgTransform: state.bg ? { zoom: bgTransform.zoom, offsetX: bgTransform.offsetX, offsetY: bgTransform.offsetY } : null,
   };
   try { localStorage.setItem('generatorFormState', JSON.stringify(data)); } catch (e) {}
@@ -495,7 +535,26 @@ function bindFilePicker(inputId, labelId, setter) {
   });
 }
 bindFilePicker('ogpInput', 'ogpLabel', f => { state.ogp = f; idbPutImage('ogp', f); saveState(); });
-bindFilePicker('iconInput', 'iconLabel', f => { state.icon = f; idbPutImage('icon', f); saveState(); });
+
+function applyIconPreview(file) {
+  const url = URL.createObjectURL(file);
+  const img = document.getElementById('previewIconImg');
+  img.src = url; img.style.display = 'block';
+  document.getElementById('previewIconPlaceholder').style.display = 'none';
+}
+bindFilePicker('iconInput', 'iconLabel', f => { state.icon = f; applyIconPreview(f); idbPutImage('icon', f); saveState(); });
+
+// ===== 誘導ダイアログのプレビュー表示切り替え =====
+const floatToggle = document.getElementById('floatToggle');
+const floatPreview = document.getElementById('floatPreview');
+floatToggle.addEventListener('change', () => {
+  floatPreview.classList.toggle('visible', floatToggle.checked);
+  saveState();
+});
+document.getElementById('previewIconArea').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('iconInput').click();
+});
 
 // ===== 数値・テキストのタップ編集(contenteditable) =====
 ['likeCount','commentCount','shareCount','username','musicName'].forEach(id => {
@@ -686,6 +745,10 @@ async function restoreState() {
     if (typeof saved.piToggle === 'boolean') piToggle.checked = saved.piToggle;
     if (saved.piCount) piCount.value = saved.piCount;
     renderPageIndicator();
+    if (typeof saved.floatToggle === 'boolean') {
+      floatToggle.checked = saved.floatToggle;
+      floatPreview.classList.toggle('visible', saved.floatToggle);
+    }
   }
 
   const [bgBlob, avatarBlob, ogpBlob, iconBlob] = await Promise.all([
@@ -704,6 +767,7 @@ async function restoreState() {
     const label = document.getElementById('iconLabel');
     label.querySelector('span').textContent = '保存済みの画像';
     label.classList.add('selected');
+    applyIconPreview(iconBlob);
   }
   check();
 }
