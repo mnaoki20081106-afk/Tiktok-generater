@@ -85,6 +85,10 @@ input:focus{border-color:rgba(255,255,255,.35)}
 input[type=file]{display:none}
 .btn-deploy{display:block;width:100%;background:linear-gradient(90deg,#fe2c55,#ff4d6d);color:#fff;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;transition:opacity .2s}
 .btn-deploy:disabled{opacity:.4;cursor:not-allowed}
+.missing-warning{display:none;background:rgba(254,44,85,.1);border:1px solid rgba(254,44,85,.35);border-radius:10px;padding:12px 14px;font-size:12.5px;color:#ff8fa3;line-height:1.7}
+.missing-warning.visible{display:block}
+.file-btn.missing{border-color:#fe2c55;color:#fe2c55}
+input.missing{border-color:#fe2c55}
 .status{font-size:13px;text-align:center;color:rgba(255,255,255,.5);min-height:18px;line-height:1.6}
 .status.ok{color:#4ade80}.status.err{color:#fe2c55}
 .result{background:#1e2e1e;border:1px solid rgba(74,222,128,.3);border-radius:10px;padding:14px;font-size:13px;color:#4ade80;word-break:break-all;display:none;text-align:center;line-height:1.8}
@@ -136,7 +140,7 @@ input[type=file]{display:none}
           </div>
           <textarea class="desc-edit" id="descEdit" rows="3" placeholder="例: 今日の一コマ #日常 #TikTok"></textarea>
           <button class="more" id="moreBtn">続きを見る</button>
-          <div class="music">🎵<span contenteditable="true" id="musicName">オリジナル楽曲</span></div>
+          <div class="music">♫<span contenteditable="true" id="musicName">オリジナル楽曲</span></div>
         </div>
 
         <div class="page-indicator" id="pageIndicator" style="display:none"></div>
@@ -225,9 +229,17 @@ input[type=file]{display:none}
       </div>
 
       <div class="card">
+        <div class="missing-warning" id="missingWarning"></div>
         <button class="btn-deploy" id="deployBtn" disabled>自動デプロイ</button>
         <div class="status" id="status"></div>
         <div class="result" id="result"></div>
+      </div>
+
+      <div class="card">
+        <div class="info">
+          入力内容はブラウザに自動保存され、次回このページを開いたときに復元されます。
+        </div>
+        <button type="button" class="file-btn" id="clearSavedBtn" style="justify-content:center">保存内容をクリア</button>
       </div>
     </div>
   </div>
@@ -238,6 +250,67 @@ input[type=file]{display:none}
 
 <script>
 const state = { bg:null, avatar:null, ogp:null, icon:null };
+
+// ===== 保存(次回開いた時に編集内容を復元) =====
+// テキスト系はlocalStorage、画像はIndexedDBに保存する
+const IDB_NAME = 'tiktokGeneratorDB', IDB_STORE = 'images';
+function openImageDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => { req.result.createObjectStore(IDB_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbPutImage(key, blob) {
+  try {
+    const db = await openImageDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(blob, key);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { /* IndexedDBが使えない場合は諦める(画像以外は保存される) */ }
+}
+async function idbGetImage(key) {
+  try {
+    const db = await openImageDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) { return null; }
+}
+async function idbClearImages() {
+  try {
+    const db = await openImageDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).clear();
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {}
+}
+
+function saveState() {
+  const data = {
+    workerName: document.getElementById('workerName').value,
+    tiktokUrl: document.getElementById('tiktokUrl').value,
+    ogpTitle: document.getElementById('ogpTitle').value,
+    username: document.getElementById('username').textContent.trim(),
+    description: typeof descText === 'string' ? descText : '',
+    musicName: document.getElementById('musicName').textContent.trim(),
+    likeCount: document.getElementById('likeCount').textContent.trim(),
+    commentCount: document.getElementById('commentCount').textContent.trim(),
+    shareCount: document.getElementById('shareCount').textContent.trim(),
+    piToggle: piToggle.checked,
+    piCount: piCount.value,
+    bgTransform: state.bg ? { zoom: bgTransform.zoom, offsetX: bgTransform.offsetX, offsetY: bgTransform.offsetY } : null,
+  };
+  try { localStorage.setItem('generatorFormState', JSON.stringify(data)); } catch (e) {}
+}
 
 const apiBaseInput = document.getElementById('apiBase');
 apiBaseInput.value = localStorage.getItem('generatorApiBase') || '';
@@ -302,7 +375,8 @@ function snapBgOffsets() {
   applyBgTransform();
 }
 
-function loadBackgroundFile(file) {
+function loadBackgroundFile(file, opts) {
+  opts = opts || {};
   state.bg = file;
   const url = URL.createObjectURL(file);
   bgImg.onload = () => {
@@ -314,15 +388,21 @@ function loadBackgroundFile(file) {
     bgTransform.baseScale = Math.max(bgTransform.dispW / bgTransform.naturalW, bgTransform.dispH / bgTransform.naturalH);
     const containScale = Math.min(bgTransform.dispW / bgTransform.naturalW, bgTransform.dispH / bgTransform.naturalH);
     const minZoom = Math.max(0.2, containScale / bgTransform.baseScale);
-    bgTransform.zoom = 1;
-    const imgW = bgTransform.naturalW * bgTransform.baseScale;
-    const imgH = bgTransform.naturalH * bgTransform.baseScale;
-    bgTransform.offsetX = (bgTransform.dispW - imgW) / 2;
-    bgTransform.offsetY = (bgTransform.dispH - imgH) / 2;
+    if (opts.savedTransform) {
+      bgTransform.zoom = opts.savedTransform.zoom || 1;
+      bgTransform.offsetX = opts.savedTransform.offsetX || 0;
+      bgTransform.offsetY = opts.savedTransform.offsetY || 0;
+    } else {
+      bgTransform.zoom = 1;
+      const imgW = bgTransform.naturalW * bgTransform.baseScale;
+      const imgH = bgTransform.naturalH * bgTransform.baseScale;
+      bgTransform.offsetX = (bgTransform.dispW - imgW) / 2;
+      bgTransform.offsetY = (bgTransform.dispH - imgH) / 2;
+    }
     applyBgTransform();
     zoomSlider.min = String(minZoom);
     zoomSlider.max = '4';
-    zoomSlider.value = '1';
+    zoomSlider.value = String(bgTransform.zoom);
     zoomRow.classList.add('visible');
   };
   bgImg.src = url;
@@ -330,6 +410,7 @@ function loadBackgroundFile(file) {
   bgEmpty.style.display = 'none';
   bgArea.classList.add('has-image');
   bgChangeBtn.style.display = 'block';
+  if (!opts.skipPersist) { idbPutImage('background', file); saveState(); }
   check();
 }
 
@@ -355,6 +436,7 @@ function endBgDrag(e) {
   bgDrag = null;
   bgArea.classList.remove('dragging');
   snapBgOffsets();
+  saveState();
 }
 bgArea.addEventListener('pointerup', endBgDrag);
 bgArea.addEventListener('pointercancel', endBgDrag);
@@ -363,7 +445,7 @@ zoomSlider.addEventListener('input', () => {
   bgTransform.zoom = parseFloat(zoomSlider.value) || 1;
   applyBgTransform();
 });
-zoomSlider.addEventListener('change', snapBgOffsets);
+zoomSlider.addEventListener('change', () => { snapBgOffsets(); saveState(); });
 
 function bakeBackground() {
   return new Promise((resolve) => {
@@ -387,12 +469,17 @@ function bakeBackground() {
   });
 }
 
-bindImagePick(document.getElementById('avatarArea'), document.getElementById('avatarInput'), (file) => {
-  state.avatar = file;
+function applyAvatarPreview(file) {
   const url = URL.createObjectURL(file);
   document.getElementById('avatarBox').innerHTML = '<img src="' + url + '" alt="">';
   const discImg = document.getElementById('discImg');
   discImg.src = url; discImg.style.display = 'block';
+}
+bindImagePick(document.getElementById('avatarArea'), document.getElementById('avatarInput'), (file) => {
+  state.avatar = file;
+  applyAvatarPreview(file);
+  idbPutImage('avatar', file);
+  saveState();
 });
 
 function bindFilePicker(inputId, labelId, setter) {
@@ -407,8 +494,8 @@ function bindFilePicker(inputId, labelId, setter) {
     check();
   });
 }
-bindFilePicker('ogpInput', 'ogpLabel', f => state.ogp = f);
-bindFilePicker('iconInput', 'iconLabel', f => state.icon = f);
+bindFilePicker('ogpInput', 'ogpLabel', f => { state.ogp = f; idbPutImage('ogp', f); saveState(); });
+bindFilePicker('iconInput', 'iconLabel', f => { state.icon = f; idbPutImage('icon', f); saveState(); });
 
 // ===== 数値・テキストのタップ編集(contenteditable) =====
 ['likeCount','commentCount','shareCount','username','musicName'].forEach(id => {
@@ -420,7 +507,10 @@ bindFilePicker('iconInput', 'iconLabel', f => state.icon = f);
     sel.removeAllRanges(); sel.addRange(range);
   });
   el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
-  el.addEventListener('blur', () => { if (!el.textContent.trim()) el.textContent = id === 'username' ? 'username' : (id === 'musicName' ? 'オリジナル楽曲' : '0'); });
+  el.addEventListener('blur', () => {
+    if (!el.textContent.trim()) el.textContent = id === 'username' ? 'username' : (id === 'musicName' ? 'オリジナル楽曲' : '0');
+    saveState();
+  });
 });
 
 // ===== 動画説明(ハッシュタグ強調 + 続きを見る) =====
@@ -466,6 +556,7 @@ descEdit.addEventListener('blur', () => {
   descWrap.style.display = 'block';
   renderDesc();
   check();
+  saveState();
 });
 renderDesc();
 
@@ -489,21 +580,41 @@ function renderPageIndicator() {
   pageIndicator.innerHTML = dots;
   pageIndicator.style.display = 'flex';
 }
-piToggle.addEventListener('change', renderPageIndicator);
-piCount.addEventListener('input', renderPageIndicator);
+piToggle.addEventListener('change', () => { renderPageIndicator(); saveState(); });
+piCount.addEventListener('input', () => { renderPageIndicator(); saveState(); });
 renderPageIndicator();
 
 // ===== デプロイ設定フィールド =====
-['workerName','tiktokUrl','ogpTitle'].forEach(id => document.getElementById(id).addEventListener('input', check));
+['workerName','tiktokUrl','ogpTitle'].forEach(id => document.getElementById(id).addEventListener('input', () => { check(); saveState(); }));
+
+const REQUIRED_FIELDS = [
+  { test: () => !!state.bg, label: '背景画像', highlightEl: () => bgArea },
+  { test: () => !!state.ogp, label: 'OGP画像', highlightEl: () => document.getElementById('ogpLabel') },
+  { test: () => !!state.icon, label: 'アプリアイコン画像', highlightEl: () => document.getElementById('iconLabel') },
+  { test: () => !!apiBaseInput.value.trim(), label: 'デプロイAPIのURL', highlightEl: () => apiBaseInput },
+  { test: () => !!document.getElementById('workerName').value.trim(), label: 'Worker名', highlightEl: () => document.getElementById('workerName') },
+  { test: () => !!document.getElementById('tiktokUrl').value.trim(), label: 'TikTokプロフィールURL', highlightEl: () => document.getElementById('tiktokUrl') },
+  { test: () => !!document.getElementById('ogpTitle').value.trim(), label: 'OGPタイトル', highlightEl: () => document.getElementById('ogpTitle') },
+];
+
+function getMissingFields() {
+  return REQUIRED_FIELDS.filter(f => !f.test());
+}
 
 function check() {
-  document.getElementById('deployBtn').disabled = !(
-    state.bg && state.ogp && state.icon &&
-    apiBaseInput.value.trim() &&
-    document.getElementById('workerName').value.trim() &&
-    document.getElementById('tiktokUrl').value.trim() &&
-    document.getElementById('ogpTitle').value.trim()
-  );
+  const missing = getMissingFields();
+  document.getElementById('deployBtn').disabled = missing.length > 0;
+  REQUIRED_FIELDS.forEach(f => {
+    const el = f.highlightEl();
+    if (el) el.classList.toggle('missing', !f.test());
+  });
+  const warn = document.getElementById('missingWarning');
+  if (missing.length > 0) {
+    warn.textContent = '⚠ 未入力の項目があります: ' + missing.map(f => f.label).join('、');
+    warn.classList.add('visible');
+  } else {
+    warn.classList.remove('visible');
+  }
 }
 
 function setStatus(msg, type) {
@@ -512,6 +623,8 @@ function setStatus(msg, type) {
 }
 
 document.getElementById('deployBtn').addEventListener('click', async () => {
+  const missing = getMissingFields();
+  if (missing.length > 0) { check(); return; }
   const btn = document.getElementById('deployBtn');
   btn.disabled = true;
   document.getElementById('result').style.display = 'none';
@@ -542,11 +655,59 @@ document.getElementById('deployBtn').addEventListener('click', async () => {
     const r = document.getElementById('result');
     r.innerHTML = '公開URL: <a href="' + json.url + '" target="_blank">' + json.url + '</a><br><small style="opacity:.6">（反映まで数秒かかる場合があります）</small>';
     r.style.display = 'block';
+    saveState();
   } catch (e) {
     setStatus('エラー: ' + e.message, 'err');
   }
   btn.disabled = false;
 });
+
+document.getElementById('clearSavedBtn').addEventListener('click', async () => {
+  if (!confirm('保存されている入力内容・画像をすべて削除します。よろしいですか？')) return;
+  try { localStorage.removeItem('generatorFormState'); } catch (e) {}
+  await idbClearImages();
+  location.reload();
+});
+
+// ===== 保存内容の復元 =====
+async function restoreState() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('generatorFormState') || 'null'); } catch (e) {}
+  if (saved) {
+    if (saved.workerName) document.getElementById('workerName').value = saved.workerName;
+    if (saved.tiktokUrl) document.getElementById('tiktokUrl').value = saved.tiktokUrl;
+    if (saved.ogpTitle) document.getElementById('ogpTitle').value = saved.ogpTitle;
+    if (saved.username) document.getElementById('username').textContent = saved.username;
+    if (saved.description) { descText = saved.description; renderDesc(); }
+    if (saved.musicName) document.getElementById('musicName').textContent = saved.musicName;
+    if (saved.likeCount) document.getElementById('likeCount').textContent = saved.likeCount;
+    if (saved.commentCount) document.getElementById('commentCount').textContent = saved.commentCount;
+    if (saved.shareCount) document.getElementById('shareCount').textContent = saved.shareCount;
+    if (typeof saved.piToggle === 'boolean') piToggle.checked = saved.piToggle;
+    if (saved.piCount) piCount.value = saved.piCount;
+    renderPageIndicator();
+  }
+
+  const [bgBlob, avatarBlob, ogpBlob, iconBlob] = await Promise.all([
+    idbGetImage('background'), idbGetImage('avatar'), idbGetImage('ogp'), idbGetImage('icon'),
+  ]);
+  if (bgBlob) loadBackgroundFile(bgBlob, { savedTransform: saved && saved.bgTransform, skipPersist: true });
+  if (avatarBlob) { state.avatar = avatarBlob; applyAvatarPreview(avatarBlob); }
+  if (ogpBlob) {
+    state.ogp = ogpBlob;
+    const label = document.getElementById('ogpLabel');
+    label.querySelector('span').textContent = '保存済みの画像';
+    label.classList.add('selected');
+  }
+  if (iconBlob) {
+    state.icon = iconBlob;
+    const label = document.getElementById('iconLabel');
+    label.querySelector('span').textContent = '保存済みの画像';
+    label.classList.add('selected');
+  }
+  check();
+}
+restoreState();
 </script>
 </body>
 </html>
