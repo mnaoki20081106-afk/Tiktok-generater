@@ -127,40 +127,46 @@ async function handleDeploy(request, env) {
     if (!secretRes.ok)
       throw new Error(secretRes.json?.errors?.[0]?.message || 'HTTP ' + secretRes.status);
 
-    // ④ workers.dev有効化
-    step = '④workers.dev有効化';
+    // ④ 画像・データをKV名前空間へ直接書き込み
+    // 新規デプロイ直後のworkers.dev URLはWorker間サブリクエストだと
+    // "Network connection lost" のような接続エラーになりやすく、
+    // リトライを重ねても解消しないことがあるため、
+    // 新しいサイトWorker自体を経由せず、Cloudflareの
+    // KV書き込みAPIへ直接アクセスしてデータを反映する。
+    step = '④データをKVへ書き込み';
+    const kvValuesBase = base + '/storage/kv/namespaces/' + kvId + '/values/';
+    async function putKV(key, body, contentType) {
+      return withRetry(async () => {
+        const res = await fetch(kvValuesBase + encodeURIComponent(key), {
+          method: 'PUT',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': contentType },
+          body,
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success)
+          throw new Error(json.errors?.[0]?.message || 'HTTP ' + res.status);
+      }, { retries: 3, baseDelayMs: 800 });
+    }
+    const kvPuts = [
+      putKV('title', title, 'text/plain'),
+      putKV('tiktokUrl', tiktokUrl, 'text/plain'),
+    ];
+    if (background) kvPuts.push(putKV('background', await background.arrayBuffer(), 'application/octet-stream'));
+    if (ogpImage)   kvPuts.push(putKV('ogpImage', await ogpImage.arrayBuffer(), 'application/octet-stream'));
+    if (appIcon)    kvPuts.push(putKV('appIcon', await appIcon.arrayBuffer(), 'application/octet-stream'));
+    await Promise.all(kvPuts);
+
+    // ⑤ workers.dev有効化
+    step = '⑤workers.dev有効化';
     await cfFetch(base + '/workers/scripts/' + workerName + '/subdomain', token, 'POST', { enabled:true });
 
-    // ⑤ サブドメイン取得
-    step = '⑤サブドメイン取得';
+    // ⑥ サブドメイン取得（公開URL算出のため）
+    step = '⑥サブドメイン取得';
     const sdRes = await cfFetch(base + '/workers/subdomain', token);
     if (!sdRes.ok) throw new Error('HTTP ' + sdRes.status);
     const subdomain = sdRes.json.result?.subdomain;
     if (!subdomain) throw new Error('サブドメインが空でした: ' + JSON.stringify(sdRes.json));
     const workerUrl = 'https://' + workerName + '.' + subdomain + '.workers.dev';
-
-    // ⑥ 画像・データをViewerWorkerへPOST
-    // デプロイ直後はworkers.devのDNS/エッジ伝播が完了しておらず、
-    // 接続エラー(ネットワーク切断のように見える)になることがあるため、
-    // 指数バックオフでリトライする。
-    step = '⑥データ送信';
-    const dataForm = new FormData();
-    dataForm.append('title', title);
-    dataForm.append('tiktokUrl', tiktokUrl);
-    if (background) dataForm.append('background', background, 'background.png');
-    if (ogpImage)   dataForm.append('ogpImage',   ogpImage,   'ogp-image.png');
-    if (appIcon)    dataForm.append('appIcon',     appIcon,    'app-icon.png');
-
-    await withRetry(async () => {
-      const uploadRes = await fetch(workerUrl + '/update', {
-        method: 'POST',
-        headers: { 'X-Secret': SECRET },
-        body: dataForm,
-      });
-      const uploadJson = await uploadRes.json();
-      if (!uploadRes.ok || !uploadJson.success)
-        throw new Error(uploadJson.error || 'HTTP ' + uploadRes.status);
-    }, { retries: 6, baseDelayMs: 1000 });
 
     return jsonR({ success:true, url:workerUrl });
   } catch(e) {
