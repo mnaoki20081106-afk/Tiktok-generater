@@ -17,13 +17,18 @@ h1{font-size:20px;font-weight:700}
 .preview-col{display:flex;flex-direction:column;align-items:center;gap:10px;flex:0 0 auto}
 .preview-hint{font-size:12px;color:rgba(255,255,255,.4);text-align:center;max-width:300px;line-height:1.6}
 .phone{position:relative;width:300px;aspect-ratio:9/19.5;border-radius:34px;overflow:hidden;background:#000;box-shadow:0 0 0 8px #1c1c1c,0 12px 40px rgba(0,0,0,.6)}
-.bg{position:absolute;inset:0;cursor:pointer}
-.bg img{width:100%;height:100%;object-fit:cover;display:block}
+.bg{position:absolute;inset:0;cursor:pointer;overflow:hidden;touch-action:none}
+.bg.has-image{cursor:grab}
+.bg.dragging{cursor:grabbing}
+.bg img{position:absolute;top:0;left:0;display:block;user-select:none;pointer-events:none}
 .bg-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:rgba(255,255,255,.35);font-size:12px;background:#151515}
-.edit-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:600;padding:3px 7px;border-radius:20px;pointer-events:none;opacity:0;transition:opacity .15s}
-.editable:hover .edit-badge,.editable:focus .edit-badge{opacity:1}
+.edit-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:600;padding:5px 9px;border-radius:20px;opacity:0;transition:opacity .15s;border:none;cursor:pointer;z-index:20}
+.bg.has-image .edit-badge{opacity:1}
+.zoom-row{display:flex;align-items:center;gap:10px;width:300px;font-size:12px;color:rgba(255,255,255,.5);display:none}
+.zoom-row.visible{display:flex}
+.zoom-row input[type=range]{flex:1;accent-color:#fe2c55}
 
-.rail{position:absolute;right:8px;bottom:88px;display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10}
+.rail{position:absolute;right:8px;bottom:132px;display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10}
 .rail-avatar{position:relative;display:block;width:38px;height:38px;cursor:pointer}
 .avatar{width:38px;height:38px;border-radius:50%;overflow:hidden;border:2px solid #fff;background:#333;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.5);text-align:center}
 .avatar img{width:100%;height:100%;object-fit:cover;display:block}
@@ -36,7 +41,7 @@ h1{font-size:20px;font-weight:700}
 .disc img{width:100%;height:100%;object-fit:cover;display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.caption{position:absolute;left:12px;right:58px;bottom:80px;color:#fff;z-index:10}
+.caption{position:absolute;left:12px;right:58px;bottom:124px;color:#fff;z-index:10}
 .uname{font-size:12.5px;font-weight:700;margin-bottom:4px;text-shadow:0 1px 3px rgba(0,0,0,.4);cursor:text;outline:none;border-radius:4px;padding:1px 3px}
 .uname:focus{background:rgba(255,255,255,.18)}
 .desc-wrap{max-height:3.6em;overflow:hidden}
@@ -48,6 +53,17 @@ h1{font-size:20px;font-weight:700}
 .music{display:flex;align-items:center;gap:5px;font-size:10.5px;opacity:.9;margin-top:6px;text-shadow:0 1px 3px rgba(0,0,0,.4)}
 .music span{cursor:text;outline:none;border-radius:4px;padding:1px 3px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .music span:focus{background:rgba(255,255,255,.18);white-space:normal;overflow:visible}
+
+.page-indicator{position:absolute;left:50%;bottom:132px;transform:translateX(-50%);display:flex;align-items:center;gap:3px;z-index:10;pointer-events:none}
+.pi-dot{width:11px;height:2.5px;border-radius:2px;background:rgba(255,255,255,.4)}
+.pi-dot.active{background:#fff;width:14px}
+
+.navbar{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 4px;background:linear-gradient(0deg,rgba(0,0,0,.55),rgba(0,0,0,0));z-index:15;pointer-events:none}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#fff}
+.nav-item svg{width:17px;height:17px}
+.nav-item .nav-label{font-size:7.5px;font-weight:500}
+.nav-plus{flex:1;display:flex;align-items:center;justify-content:center}
+.nav-plus svg{width:32px;height:21px}
 
 /* ===== 右側:設定パネル ===== */
 .panel{flex:1 1 340px;min-width:300px;max-width:400px;display:flex;flex-direction:column;gap:20px}
@@ -82,10 +98,10 @@ input[type=file]{display:none}
   <div class="layout">
     <div class="preview-col">
       <div class="phone" id="phone">
-        <div class="bg editable" id="bgArea">
+        <div class="bg" id="bgArea">
           <div class="bg-empty" id="bgEmpty">タップして<br>背景画像を選択</div>
           <img id="bgImg" style="display:none" alt="">
-          <div class="edit-badge">タップして変更</div>
+          <button type="button" class="edit-badge" id="bgChangeBtn" style="display:none">画像を変更</button>
         </div>
 
         <div class="rail">
@@ -117,8 +133,41 @@ input[type=file]{display:none}
           <button class="more" id="moreBtn">続きを見る</button>
           <div class="music">🎵<span contenteditable="true" id="musicName">オリジナル楽曲</span></div>
         </div>
+
+        <div class="page-indicator" id="pageIndicator" style="display:none"></div>
+
+        <div class="navbar">
+          <div class="nav-item">
+            <svg viewBox="0 0 48 48" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M24.9505 7.84001C24.3975 7.38666 23.6014 7.38666 23.0485 7.84003L6.94846 21.04C6.45839 21.4418 6.2737 22.1083 6.48706 22.705C6.70041 23.3017 7.26576 23.7 7.89949 23.7H10.2311L11.4232 36.7278C11.5409 38.0149 12.6203 39 13.9128 39H21.5C22.0523 39 22.5 38.5523 22.5 38V28.3153C22.5 27.763 22.9477 27.3153 23.5 27.3153H24.5C25.0523 27.3153 25.5 27.763 25.5 28.3153V38C25.5 38.5523 25.9477 39 26.5 39H34.0874C35.3798 39 36.4592 38.0149 36.577 36.7278L37.7691 23.7H40.1001C40.7338 23.7 41.2992 23.3017 41.5125 22.705C41.7259 22.1082 41.5412 21.4418 41.0511 21.04L24.9505 7.84001Z"></path></svg>
+            <span class="nav-label">ホーム</span>
+          </div>
+          <div class="nav-item" style="opacity:.75">
+            <svg viewBox="0 0 36 36" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M18 28.0547C23.553 28.0547 28.0547 23.5531 28.0547 18C28.0547 12.4469 23.553 7.94531 18 7.94531C12.4469 7.94531 7.94531 12.4469 7.94531 18C7.94531 23.5531 12.4469 28.0547 18 28.0547ZM30.375 18C30.375 24.8345 24.8345 30.375 18 30.375C11.1655 30.375 5.625 24.8345 5.625 18C5.625 11.1655 11.1655 5.625 18 5.625C24.8345 5.625 30.375 11.1655 30.375 18Z"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M20.3508 20.3864C20.712 20.1679 20.9645 19.8074 21.0462 19.3932L22.427 12.3948C22.5027 12.0113 22.0871 11.7204 21.7527 11.9226L15.6486 15.6137C15.2874 15.8322 15.0349 16.1928 14.9532 16.6069L13.5724 23.6053C13.4967 23.9888 13.9123 24.2797 14.2467 24.0775L20.3508 20.3864ZM16.5684 20.0442L18.9029 18.6325L19.431 15.9559L17.0965 17.3676L16.5684 20.0442Z"></path></svg>
+            <span class="nav-label">トレンド</span>
+          </div>
+          <div class="nav-plus">
+            <svg viewBox="0 0 75 49" fill="none">
+              <path fill="#FA2D6C" fill-rule="evenodd" d="M23.5 23.3c0-4.48 0-6.72.872-8.432a8 8 0 0 1 3.496-3.496C29.58 10.5 31.82 10.5 36.3 10.5h9.9c4.48 0 6.72 0 8.432.872a8 8 0 0 1 3.496 3.496C59 16.58 59 18.82 59 23.3v2.4c0 4.48 0 6.72-.872 8.432a8 8 0 0 1-3.496 3.496c-1.711.872-3.952.872-8.432.872h-9.9c-4.48 0-6.72 0-8.432-.872a8 8 0 0 1-3.496-3.496C23.5 32.42 23.5 30.18 23.5 25.7z" clip-rule="evenodd"></path>
+              <path fill="#20D5EC" fill-rule="evenodd" d="M16 23.3c0-4.48 0-6.72.872-8.432a8 8 0 0 1 3.496-3.496C22.08 10.5 24.32 10.5 28.8 10.5h9.9c4.48 0 6.72 0 8.432.872a8 8 0 0 1 3.496 3.496c.872 1.711.872 3.952.872 8.432v2.4c0 4.48 0 6.72-.872 8.432a8 8 0 0 1-3.496 3.496c-1.711.872-3.952.872-8.432.872h-9.9c-4.48 0-6.72 0-8.432-.872a8 8 0 0 1-3.496-3.496C16 32.42 16 30.18 16 25.7z" clip-rule="evenodd"></path>
+              <rect width="36" height="28" x="19.5" y="10.5" fill="#fff" rx="8"></rect>
+              <path fill="#161823" fill-rule="evenodd" d="M36.5 18.25a.5.5 0 0 0-.5.5v4.75h-4.75a.5.5 0 0 0-.5.5v1.5a.5.5 0 0 0 .5.5H36v4.75a.5.5 0 0 0 .5.5H38a.5.5 0 0 0 .5-.5V26h4.75a.5.5 0 0 0 .5-.5V24a.5.5 0 0 0-.5-.5H38.5v-4.75a.5.5 0 0 0-.5-.5z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="nav-item" style="opacity:.75">
+            <svg viewBox="0 0 32 32" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M24.0362 21.3333H18.5243L15.9983 24.4208L13.4721 21.3333H7.96047L7.99557 8H24.0009L24.0362 21.3333ZM24.3705 23.3333H19.4721L17.2883 26.0026C16.6215 26.8176 15.3753 26.8176 14.7084 26.0026L12.5243 23.3333H7.62626C6.70407 23.3333 5.95717 22.5845 5.9596 21.6623L5.99646 7.66228C5.99887 6.74352 6.74435 6 7.66312 6H24.3333C25.2521 6 25.9975 6.7435 26 7.66224L26.0371 21.6622C26.0396 22.5844 25.2927 23.3333 24.3705 23.3333ZM12.6647 14C12.2965 14 11.998 14.2985 11.998 14.6667V15.3333C11.998 15.7015 12.2965 16 12.6647 16H19.3313C19.6995 16 19.998 15.7015 19.998 15.3333V14.6667C19.998 14.2985 19.6995 14 19.3313 14H12.6647Z"></path></svg>
+            <span class="nav-label">メッセージ</span>
+          </div>
+          <div class="nav-item" style="opacity:.75">
+            <svg viewBox="0 0 48 48" fill="#fff"><path fill-rule="evenodd" clip-rule="evenodd" d="M24.0001 11.5C20.9625 11.5 18.5001 13.9624 18.5001 17C18.5001 20.0376 20.9625 22.5 24.0001 22.5C27.0377 22.5 29.5001 20.0376 29.5001 17C29.5001 13.9624 27.0377 11.5 24.0001 11.5ZM15.5001 17C15.5001 12.3056 19.3057 8.5 24.0001 8.5C28.6945 8.5 32.5001 12.3056 32.5001 17C32.5001 21.6944 28.6945 25.5 24.0001 25.5C19.3057 25.5 15.5001 21.6944 15.5001 17ZM24.0001 30.5C19.1458 30.5 15.0586 33.7954 13.8578 38.2712C13.7147 38.8046 13.2038 39.1741 12.6591 39.0827L11.6729 38.9173C11.1282 38.8259 10.7571 38.3085 10.8888 37.7722C12.3362 31.8748 17.6559 27.5 24.0001 27.5C30.3443 27.5 35.664 31.8748 37.1114 37.7722C37.2431 38.3085 36.872 38.8259 36.3273 38.9173L35.3411 39.0827C34.7964 39.1741 34.2855 38.8046 34.1424 38.2712C32.9416 33.7954 28.8544 30.5 24.0001 30.5Z"></path></svg>
+            <span class="nav-label">プロフィール</span>
+          </div>
+        </div>
       </div>
-      <div class="preview-hint">背景・アイコンはタップして画像を選択、数値やテキストはタップして直接入力できます</div>
+      <div class="zoom-row" id="zoomRow">
+        <span>ズーム</span>
+        <input type="range" id="zoomSlider" min="1" max="4" step="0.01" value="1">
+      </div>
+      <div class="preview-hint">背景はドラッグで位置調整・スライダーで拡大縮小、アイコンはタップして画像を選択、数値やテキストはタップして直接入力できます</div>
     </div>
 
     <div class="panel">
@@ -161,6 +210,18 @@ input[type=file]{display:none}
       </div>
 
       <div class="card">
+        <div class="sec">ページインジケーター（見た目のみ）</div>
+        <div class="field" style="flex-direction:row;align-items:center;justify-content:space-between">
+          <label class="fl" for="piToggle" style="margin:0">表示する</label>
+          <input type="checkbox" id="piToggle" style="width:18px;height:18px">
+        </div>
+        <div class="field">
+          <label class="fl">ドットの数（最大6）</label>
+          <input type="text" id="piCount" value="3" inputmode="numeric" style="max-width:80px">
+        </div>
+      </div>
+
+      <div class="card">
         <button class="btn-deploy" id="deployBtn" disabled>自動デプロイ</button>
         <div class="status" id="status"></div>
         <div class="result" id="result"></div>
@@ -190,13 +251,121 @@ function bindImagePick(triggerEl, inputEl, onPicked) {
   });
 }
 
-bindImagePick(document.getElementById('bgArea'), document.getElementById('bgInput'), (file) => {
+// ===== 背景画像: ズーム・パン・スナップ =====
+const bgArea = document.getElementById('bgArea');
+const bgImg = document.getElementById('bgImg');
+const bgInput = document.getElementById('bgInput');
+const bgChangeBtn = document.getElementById('bgChangeBtn');
+const bgEmpty = document.getElementById('bgEmpty');
+const zoomRow = document.getElementById('zoomRow');
+const zoomSlider = document.getElementById('zoomSlider');
+const SNAP_PX = 10;
+
+const bgTransform = { naturalW: 0, naturalH: 0, dispW: 0, dispH: 0, baseScale: 1, zoom: 1, offsetX: 0, offsetY: 0 };
+
+function clampOffsets() {
+  const imgW = bgTransform.naturalW * bgTransform.baseScale * bgTransform.zoom;
+  const imgH = bgTransform.naturalH * bgTransform.baseScale * bgTransform.zoom;
+  const minX = Math.min(0, bgTransform.dispW - imgW);
+  const minY = Math.min(0, bgTransform.dispH - imgH);
+  bgTransform.offsetX = Math.max(minX, Math.min(0, bgTransform.offsetX));
+  bgTransform.offsetY = Math.max(minY, Math.min(0, bgTransform.offsetY));
+  return { imgW, imgH, minX, minY };
+}
+
+function applyBgTransform() {
+  const { imgW, imgH } = clampOffsets();
+  bgImg.style.width = imgW + 'px';
+  bgImg.style.height = imgH + 'px';
+  bgImg.style.left = bgTransform.offsetX + 'px';
+  bgImg.style.top = bgTransform.offsetY + 'px';
+}
+
+function snapBgOffsets() {
+  const { minX, minY } = clampOffsets();
+  if (Math.abs(bgTransform.offsetX - 0) < SNAP_PX) bgTransform.offsetX = 0;
+  else if (Math.abs(bgTransform.offsetX - minX) < SNAP_PX) bgTransform.offsetX = minX;
+  if (Math.abs(bgTransform.offsetY - 0) < SNAP_PX) bgTransform.offsetY = 0;
+  else if (Math.abs(bgTransform.offsetY - minY) < SNAP_PX) bgTransform.offsetY = minY;
+  applyBgTransform();
+}
+
+function loadBackgroundFile(file) {
   state.bg = file;
   const url = URL.createObjectURL(file);
-  const img = document.getElementById('bgImg');
-  img.src = url; img.style.display = 'block';
-  document.getElementById('bgEmpty').style.display = 'none';
+  bgImg.onload = () => {
+    const rect = bgArea.getBoundingClientRect();
+    bgTransform.naturalW = bgImg.naturalWidth;
+    bgTransform.naturalH = bgImg.naturalHeight;
+    bgTransform.dispW = rect.width;
+    bgTransform.dispH = rect.height;
+    bgTransform.baseScale = Math.max(bgTransform.dispW / bgTransform.naturalW, bgTransform.dispH / bgTransform.naturalH);
+    bgTransform.zoom = 1;
+    const imgW = bgTransform.naturalW * bgTransform.baseScale;
+    const imgH = bgTransform.naturalH * bgTransform.baseScale;
+    bgTransform.offsetX = (bgTransform.dispW - imgW) / 2;
+    bgTransform.offsetY = (bgTransform.dispH - imgH) / 2;
+    applyBgTransform();
+    zoomSlider.value = '1';
+    zoomRow.classList.add('visible');
+  };
+  bgImg.src = url;
+  bgImg.style.display = 'block';
+  bgEmpty.style.display = 'none';
+  bgArea.classList.add('has-image');
+  bgChangeBtn.style.display = 'block';
+  check();
+}
+
+bindImagePick(bgEmpty, bgInput, loadBackgroundFile);
+bgChangeBtn.addEventListener('click', (e) => { e.stopPropagation(); bgInput.click(); });
+bgInput.addEventListener('change', function () { if (this.files.length > 0) loadBackgroundFile(this.files[0]); });
+
+let bgDrag = null;
+bgArea.addEventListener('pointerdown', (e) => {
+  if (!state.bg) return;
+  bgDrag = { startX: e.clientX, startY: e.clientY, offsetX: bgTransform.offsetX, offsetY: bgTransform.offsetY };
+  bgArea.classList.add('dragging');
+  bgArea.setPointerCapture(e.pointerId);
 });
+bgArea.addEventListener('pointermove', (e) => {
+  if (!bgDrag) return;
+  bgTransform.offsetX = bgDrag.offsetX + (e.clientX - bgDrag.startX);
+  bgTransform.offsetY = bgDrag.offsetY + (e.clientY - bgDrag.startY);
+  applyBgTransform();
+});
+function endBgDrag(e) {
+  if (!bgDrag) return;
+  bgDrag = null;
+  bgArea.classList.remove('dragging');
+  snapBgOffsets();
+}
+bgArea.addEventListener('pointerup', endBgDrag);
+bgArea.addEventListener('pointercancel', endBgDrag);
+
+zoomSlider.addEventListener('input', () => {
+  bgTransform.zoom = parseFloat(zoomSlider.value) || 1;
+  applyBgTransform();
+});
+zoomSlider.addEventListener('change', snapBgOffsets);
+
+function bakeBackground() {
+  return new Promise((resolve) => {
+    if (!state.bg) { resolve(null); return; }
+    if (!bgTransform.naturalW) { resolve(state.bg); return; }
+    const bakeW = 1080, bakeH = Math.round(bakeW * 19.5 / 9);
+    const canvas = document.createElement('canvas');
+    canvas.width = bakeW; canvas.height = bakeH;
+    const ctx = canvas.getContext('2d');
+    const effScale = bgTransform.baseScale * bgTransform.zoom;
+    const srcX = -bgTransform.offsetX / effScale;
+    const srcY = -bgTransform.offsetY / effScale;
+    const srcW = bgTransform.dispW / effScale;
+    const srcH = bgTransform.dispH / effScale;
+    ctx.drawImage(bgImg, srcX, srcY, srcW, srcH, 0, 0, bakeW, bakeH);
+    canvas.toBlob((blob) => resolve(blob), 'image/png');
+  });
+}
 
 bindImagePick(document.getElementById('avatarArea'), document.getElementById('avatarInput'), (file) => {
   state.avatar = file;
@@ -280,6 +449,30 @@ descEdit.addEventListener('blur', () => {
 });
 renderDesc();
 
+// ===== ページインジケーター(見た目のみ) =====
+const piToggle = document.getElementById('piToggle');
+const piCount = document.getElementById('piCount');
+const pageIndicator = document.getElementById('pageIndicator');
+
+function renderPageIndicator() {
+  if (!piToggle.checked) {
+    pageIndicator.style.display = 'none';
+    pageIndicator.innerHTML = '';
+    return;
+  }
+  let n = parseInt(piCount.value, 10);
+  if (!Number.isFinite(n) || n < 1) n = 1;
+  if (n > 6) n = 6;
+  piCount.value = String(n);
+  let dots = '';
+  for (let i = 0; i < n; i++) dots += '<span class="pi-dot' + (i === 0 ? ' active' : '') + '"></span>';
+  pageIndicator.innerHTML = dots;
+  pageIndicator.style.display = 'flex';
+}
+piToggle.addEventListener('change', renderPageIndicator);
+piCount.addEventListener('input', renderPageIndicator);
+renderPageIndicator();
+
 // ===== デプロイ設定フィールド =====
 ['workerName','tiktokUrl','ogpTitle'].forEach(id => document.getElementById(id).addEventListener('input', check));
 
@@ -315,7 +508,10 @@ document.getElementById('deployBtn').addEventListener('click', async () => {
     form.append('likeCount', document.getElementById('likeCount').textContent.trim());
     form.append('commentCount', document.getElementById('commentCount').textContent.trim());
     form.append('shareCount', document.getElementById('shareCount').textContent.trim());
-    form.append('background', state.bg, 'background.png');
+    form.append('showPageIndicator', piToggle.checked ? '1' : '0');
+    form.append('pageIndicatorCount', piCount.value.trim() || '3');
+    const bakedBg = await bakeBackground();
+    form.append('background', bakedBg || state.bg, 'background.png');
     form.append('ogpImage', state.ogp, 'ogp-image.png');
     form.append('appIcon', state.icon, 'app-icon.png');
     if (state.avatar) form.append('avatar', state.avatar, 'avatar.png');
