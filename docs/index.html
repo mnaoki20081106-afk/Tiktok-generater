@@ -34,7 +34,7 @@ h1{font-size:20px;font-weight:700}
 .pi-row input[type=text]{width:48px;background:#2a2a2a;border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;padding:5px 6px;font-size:12px;text-align:center}
 
 /* ===== プレビュー内の誘導ダイアログ(見た目確認用。実際のサイトは常時表示) ===== */
-.p-ov{position:absolute;inset:0;background:rgba(0,0,0,0.514);z-index:3001;display:none;align-items:center;justify-content:center;padding:0 16px}
+.p-ov{position:absolute;inset:0;background:rgba(0,0,0,0.62);z-index:3001;display:none;align-items:center;justify-content:center;padding:0 16px}
 .p-ov.visible{display:flex}
 .p-mc{background:#fff;border-radius:10px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,0.3)}
 .p-mb{padding:20px 18px 0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:7px}
@@ -62,14 +62,12 @@ h1{font-size:20px;font-weight:700}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 .caption{position:absolute;left:12px;right:58px;bottom:58px;color:#fff;z-index:10}
-.uname{font-size:12.5px;font-weight:700;margin-bottom:4px;text-shadow:0 1px 3px rgba(0,0,0,.4);cursor:text;outline:none;border-radius:4px;padding:1px 3px}
+.uname{font-size:14px;font-weight:700;margin-bottom:4px;text-shadow:0 1px 3px rgba(0,0,0,.4);cursor:text;outline:none;border-radius:4px;padding:1px 3px}
 .uname:focus{background:rgba(255,255,255,.18)}
-.desc-wrap{max-height:3.6em;overflow:hidden}
-.desc-wrap.expanded{max-height:none}
-.desc{font-size:11.5px;line-height:1.4;text-shadow:0 1px 3px rgba(0,0,0,.4);word-break:break-word;cursor:text}
-.desc .tag{font-weight:700}
+.desc-wrap{max-height:32px;overflow:hidden;font-size:11.5px;line-height:1.4;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);word-break:break-word;cursor:text}
+.desc-wrap .tag{font-weight:700}
 .desc-edit{width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.3);border-radius:6px;color:#fff;font-size:11.5px;padding:4px;resize:vertical;font-family:inherit;display:none}
-.more{display:none;background:none;border:none;color:rgba(255,255,255,.75);font-size:10.5px;font-weight:600;padding:2px 0 0;cursor:pointer;text-align:left}
+.more-inline{display:none;font-weight:400;opacity:.8;margin-left:2px;white-space:nowrap}
 .music{display:flex;align-items:center;gap:5px;font-size:10.5px;opacity:.9;margin-top:6px;text-shadow:0 1px 3px rgba(0,0,0,.4)}
 .music span{cursor:text;outline:none;border-radius:4px;padding:1px 3px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .music span:focus{background:rgba(255,255,255,.18);white-space:normal;overflow:visible}
@@ -150,11 +148,8 @@ input.missing{border-color:#fe2c55}
 
         <div class="caption">
           <div class="uname" contenteditable="true" id="username">username</div>
-          <div class="desc-wrap" id="descWrap">
-            <div class="desc" id="descDisplay">タップして動画の説明・ハッシュタグを入力</div>
-          </div>
+          <div class="desc-wrap" id="descWrap"><span id="descDisplay">タップして動画の説明・ハッシュタグを入力</span><span class="more-inline" id="moreInline">もっと見る</span></div>
           <textarea class="desc-edit" id="descEdit" rows="3" placeholder="例: 今日の一コマ #日常 #TikTok"></textarea>
-          <button class="more" id="moreBtn">続きを見る</button>
           <div class="music">♫<span contenteditable="true" id="musicName">オリジナル楽曲</span></div>
         </div>
 
@@ -382,20 +377,15 @@ const bgTransform = { naturalW: 0, naturalH: 0, dispW: 0, dispH: 0, baseScale: 1
 function clampOffsets() {
   const imgW = bgTransform.naturalW * bgTransform.baseScale * bgTransform.zoom;
   const imgH = bgTransform.naturalH * bgTransform.baseScale * bgTransform.zoom;
-  // 画像がその軸でコンテナより小さい場合は中央寄せしてレターボックスにする(パン不要)
-  if (imgW >= bgTransform.dispW) {
-    bgTransform.offsetX = Math.max(bgTransform.dispW - imgW, Math.min(0, bgTransform.offsetX));
-  } else {
-    bgTransform.offsetX = (bgTransform.dispW - imgW) / 2;
-  }
-  if (imgH >= bgTransform.dispH) {
-    bgTransform.offsetY = Math.max(bgTransform.dispH - imgH, Math.min(0, bgTransform.offsetY));
-  } else {
-    bgTransform.offsetY = (bgTransform.dispH - imgH) / 2;
-  }
-  const minX = Math.min(0, bgTransform.dispW - imgW);
-  const minY = Math.min(0, bgTransform.dispH - imgH);
-  return { imgW, imgH, minX, minY };
+  // 画像がその軸でコンテナより小さい場合(レターボックス)も、
+  // 完全に上端(0)〜下端(dispH-imgH)まで指でドラッグして位置調整できるようにする
+  const dX = bgTransform.dispW - imgW;
+  const dY = bgTransform.dispH - imgH;
+  const minX = Math.min(0, dX), maxX = Math.max(0, dX);
+  const minY = Math.min(0, dY), maxY = Math.max(0, dY);
+  bgTransform.offsetX = Math.max(minX, Math.min(maxX, bgTransform.offsetX));
+  bgTransform.offsetY = Math.max(minY, Math.min(maxY, bgTransform.offsetY));
+  return { imgW, imgH, minX, minY, maxX, maxY };
 }
 
 function applyBgTransform() {
@@ -406,12 +396,17 @@ function applyBgTransform() {
   bgImg.style.top = bgTransform.offsetY + 'px';
 }
 
+function snapAxis(offset, min, max) {
+  const candidates = [0, min, max];
+  for (const c of candidates) {
+    if (Math.abs(offset - c) < SNAP_PX) return c;
+  }
+  return offset;
+}
 function snapBgOffsets() {
-  const { minX, minY } = clampOffsets();
-  if (Math.abs(bgTransform.offsetX - 0) < SNAP_PX) bgTransform.offsetX = 0;
-  else if (Math.abs(bgTransform.offsetX - minX) < SNAP_PX) bgTransform.offsetX = minX;
-  if (Math.abs(bgTransform.offsetY - 0) < SNAP_PX) bgTransform.offsetY = 0;
-  else if (Math.abs(bgTransform.offsetY - minY) < SNAP_PX) bgTransform.offsetY = minY;
+  const { minX, minY, maxX, maxY } = clampOffsets();
+  bgTransform.offsetX = snapAxis(bgTransform.offsetX, minX, maxX);
+  bgTransform.offsetY = snapAxis(bgTransform.offsetY, minY, maxY);
   applyBgTransform();
 }
 
@@ -576,42 +571,46 @@ document.getElementById('previewIconArea').addEventListener('click', (e) => {
 const descDisplay = document.getElementById('descDisplay');
 const descEdit = document.getElementById('descEdit');
 const descWrap = document.getElementById('descWrap');
-const moreBtn = document.getElementById('moreBtn');
+const moreInline = document.getElementById('moreInline');
 let descText = '';
-let descTouched = false;
 
+function escDesc(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function renderDescCut(n) {
+  const t = n === null ? descText : descText.slice(0, n);
+  descDisplay.innerHTML = escDesc(t).replace(/(^|\s)(#[^\s#]+)/g, (m, pre, tag) => pre + '<span class="tag">' + tag + '</span>');
+}
+// 実際のサイトと同じロジックで、必ず2行に収まるように末尾を切り詰めて
+// 「もっと見る」を末尾にインライン表示する(タップしても展開しない見た目だけの表示)
 function renderDesc() {
+  moreInline.style.display = 'none';
   if (!descText.trim()) {
-    descDisplay.innerHTML = 'タップして動画の説明・ハッシュタグを入力';
-    moreBtn.style.display = 'none';
+    descDisplay.textContent = 'タップして動画の説明・ハッシュタグを入力';
     return;
   }
-  const escaped = descText.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  descDisplay.innerHTML = escaped.replace(/(^|\s)(#[^\s#]+)/g, (m, pre, tag) => pre + '<span class="tag">' + tag + '</span>');
-  descWrap.classList.remove('expanded');
-  moreBtn.textContent = '続きを見る';
+  renderDescCut(null);
   requestAnimationFrame(() => {
-    moreBtn.style.display = descWrap.scrollHeight > descWrap.clientHeight + 2 ? 'block' : 'none';
+    if (descWrap.scrollHeight <= descWrap.clientHeight + 1) return;
+    moreInline.style.display = 'inline';
+    let lo = 0, hi = descText.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      renderDescCut(mid);
+      if (descWrap.scrollHeight <= descWrap.clientHeight + 1) lo = mid; else hi = mid - 1;
+    }
+    renderDescCut(lo);
   });
 }
-moreBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  descWrap.classList.toggle('expanded');
-  moreBtn.textContent = descWrap.classList.contains('expanded') ? '閉じる' : '続きを見る';
-});
-descDisplay.addEventListener('click', () => {
+descWrap.addEventListener('click', () => {
   descEdit.value = descText;
-  descDisplay.style.display = 'none';
   descWrap.style.display = 'none';
-  moreBtn.style.display = 'none';
   descEdit.style.display = 'block';
   descEdit.focus();
 });
 descEdit.addEventListener('blur', () => {
   descText = descEdit.value;
-  descTouched = true;
   descEdit.style.display = 'none';
-  descDisplay.style.display = 'block';
   descWrap.style.display = 'block';
   renderDesc();
   check();
