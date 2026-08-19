@@ -24,11 +24,16 @@ h1{font-size:20px;font-weight:700}
 .bg-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:rgba(255,255,255,.35);font-size:12px;background:#151515}
 .edit-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:600;padding:5px 9px;border-radius:20px;opacity:0;transition:opacity .15s;border:none;cursor:pointer;z-index:20}
 .bg.has-image .edit-badge{opacity:1}
-.zoom-row{display:flex;align-items:center;gap:10px;width:300px;font-size:12px;color:rgba(255,255,255,.5);display:none}
+.zoom-row{align-items:center;gap:10px;width:300px;font-size:12px;color:rgba(255,255,255,.5);display:none}
 .zoom-row.visible{display:flex}
 .zoom-row input[type=range]{flex:1;accent-color:#fe2c55}
 
-.rail{position:absolute;right:8px;bottom:132px;display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10}
+.pi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;width:300px;font-size:12px;color:rgba(255,255,255,.5);background:#1a1a1a;border-radius:10px;padding:10px 12px}
+.pi-row .pi-left{display:flex;align-items:center;gap:8px}
+.pi-row input[type=checkbox]{width:16px;height:16px}
+.pi-row input[type=text]{width:48px;background:#2a2a2a;border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;padding:5px 6px;font-size:12px;text-align:center}
+
+.rail{position:absolute;right:8px;bottom:62px;display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10}
 .rail-avatar{position:relative;display:block;width:38px;height:38px;cursor:pointer}
 .avatar{width:38px;height:38px;border-radius:50%;overflow:hidden;border:2px solid #fff;background:#333;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.5);text-align:center}
 .avatar img{width:100%;height:100%;object-fit:cover;display:block}
@@ -41,7 +46,7 @@ h1{font-size:20px;font-weight:700}
 .disc img{width:100%;height:100%;object-fit:cover;display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.caption{position:absolute;left:12px;right:58px;bottom:124px;color:#fff;z-index:10}
+.caption{position:absolute;left:12px;right:58px;bottom:58px;color:#fff;z-index:10}
 .uname{font-size:12.5px;font-weight:700;margin-bottom:4px;text-shadow:0 1px 3px rgba(0,0,0,.4);cursor:text;outline:none;border-radius:4px;padding:1px 3px}
 .uname:focus{background:rgba(255,255,255,.18)}
 .desc-wrap{max-height:3.6em;overflow:hidden}
@@ -54,16 +59,16 @@ h1{font-size:20px;font-weight:700}
 .music span{cursor:text;outline:none;border-radius:4px;padding:1px 3px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .music span:focus{background:rgba(255,255,255,.18);white-space:normal;overflow:visible}
 
-.page-indicator{position:absolute;left:50%;bottom:132px;transform:translateX(-50%);display:flex;align-items:center;gap:3px;z-index:10;pointer-events:none}
-.pi-dot{width:11px;height:2.5px;border-radius:2px;background:rgba(255,255,255,.4)}
-.pi-dot.active{background:#fff;width:14px}
+.page-indicator{position:absolute;left:50%;bottom:62px;transform:translateX(-50%);display:flex;align-items:center;gap:5px;z-index:10;pointer-events:none}
+.pi-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.4)}
+.pi-dot.active{background:#fff}
 
-.navbar{position:absolute;left:0;right:0;bottom:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 4px;background:linear-gradient(0deg,rgba(0,0,0,.55),rgba(0,0,0,0));z-index:15;pointer-events:none}
+.navbar{position:absolute;left:0;right:0;bottom:0;height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 4px;background:linear-gradient(0deg,rgba(0,0,0,.55),rgba(0,0,0,0));z-index:15;pointer-events:none}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#fff}
-.nav-item svg{width:17px;height:17px}
-.nav-item .nav-label{font-size:7.5px;font-weight:500}
+.nav-item svg{width:27px;height:27px}
+.nav-item .nav-label{font-size:8.5px;font-weight:500}
 .nav-plus{flex:1;display:flex;align-items:center;justify-content:center}
-.nav-plus svg{width:32px;height:21px}
+.nav-plus svg{width:45px;height:30px}
 
 /* ===== 右側:設定パネル ===== */
 .panel{flex:1 1 340px;min-width:300px;max-width:400px;display:flex;flex-direction:column;gap:20px}
@@ -167,6 +172,16 @@ input[type=file]{display:none}
         <span>ズーム</span>
         <input type="range" id="zoomSlider" min="1" max="4" step="0.01" value="1">
       </div>
+      <div class="pi-row">
+        <div class="pi-left">
+          <input type="checkbox" id="piToggle">
+          <label for="piToggle">ページインジケーター（見た目のみ）</label>
+        </div>
+        <div class="pi-left">
+          <span>個数</span>
+          <input type="text" id="piCount" value="3" inputmode="numeric">
+        </div>
+      </div>
       <div class="preview-hint">背景はドラッグで位置調整・スライダーで拡大縮小、アイコンはタップして画像を選択、数値やテキストはタップして直接入力できます</div>
     </div>
 
@@ -206,18 +221,6 @@ input[type=file]{display:none}
           <label class="fl">アプリアイコン画像 <span style="color:rgba(255,255,255,.3);font-weight:400">(誘導ダイアログ用)</span></label>
           <label class="file-btn" id="iconLabel" for="iconInput"><span>タップして選択</span></label>
           <input type="file" id="iconInput" accept="image/*">
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="sec">ページインジケーター（見た目のみ）</div>
-        <div class="field" style="flex-direction:row;align-items:center;justify-content:space-between">
-          <label class="fl" for="piToggle" style="margin:0">表示する</label>
-          <input type="checkbox" id="piToggle" style="width:18px;height:18px">
-        </div>
-        <div class="field">
-          <label class="fl">ドットの数（最大6）</label>
-          <input type="text" id="piCount" value="3" inputmode="numeric" style="max-width:80px">
         </div>
       </div>
 
@@ -266,10 +269,19 @@ const bgTransform = { naturalW: 0, naturalH: 0, dispW: 0, dispH: 0, baseScale: 1
 function clampOffsets() {
   const imgW = bgTransform.naturalW * bgTransform.baseScale * bgTransform.zoom;
   const imgH = bgTransform.naturalH * bgTransform.baseScale * bgTransform.zoom;
+  // 画像がその軸でコンテナより小さい場合は中央寄せしてレターボックスにする(パン不要)
+  if (imgW >= bgTransform.dispW) {
+    bgTransform.offsetX = Math.max(bgTransform.dispW - imgW, Math.min(0, bgTransform.offsetX));
+  } else {
+    bgTransform.offsetX = (bgTransform.dispW - imgW) / 2;
+  }
+  if (imgH >= bgTransform.dispH) {
+    bgTransform.offsetY = Math.max(bgTransform.dispH - imgH, Math.min(0, bgTransform.offsetY));
+  } else {
+    bgTransform.offsetY = (bgTransform.dispH - imgH) / 2;
+  }
   const minX = Math.min(0, bgTransform.dispW - imgW);
   const minY = Math.min(0, bgTransform.dispH - imgH);
-  bgTransform.offsetX = Math.max(minX, Math.min(0, bgTransform.offsetX));
-  bgTransform.offsetY = Math.max(minY, Math.min(0, bgTransform.offsetY));
   return { imgW, imgH, minX, minY };
 }
 
@@ -300,12 +312,16 @@ function loadBackgroundFile(file) {
     bgTransform.dispW = rect.width;
     bgTransform.dispH = rect.height;
     bgTransform.baseScale = Math.max(bgTransform.dispW / bgTransform.naturalW, bgTransform.dispH / bgTransform.naturalH);
+    const containScale = Math.min(bgTransform.dispW / bgTransform.naturalW, bgTransform.dispH / bgTransform.naturalH);
+    const minZoom = Math.max(0.2, containScale / bgTransform.baseScale);
     bgTransform.zoom = 1;
     const imgW = bgTransform.naturalW * bgTransform.baseScale;
     const imgH = bgTransform.naturalH * bgTransform.baseScale;
     bgTransform.offsetX = (bgTransform.dispW - imgW) / 2;
     bgTransform.offsetY = (bgTransform.dispH - imgH) / 2;
     applyBgTransform();
+    zoomSlider.min = String(minZoom);
+    zoomSlider.max = '4';
     zoomSlider.value = '1';
     zoomRow.classList.add('visible');
   };
@@ -357,12 +373,16 @@ function bakeBackground() {
     const canvas = document.createElement('canvas');
     canvas.width = bakeW; canvas.height = bakeH;
     const ctx = canvas.getContext('2d');
-    const effScale = bgTransform.baseScale * bgTransform.zoom;
-    const srcX = -bgTransform.offsetX / effScale;
-    const srcY = -bgTransform.offsetY / effScale;
-    const srcW = bgTransform.dispW / effScale;
-    const srcH = bgTransform.dispH / effScale;
-    ctx.drawImage(bgImg, srcX, srcY, srcW, srcH, 0, 0, bakeW, bakeH);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, bakeW, bakeH);
+    // dispW/dispHとbakeW/bakeHは同じアスペクト比なのでscaleRatioは縦横共通
+    const scaleRatio = bakeW / bgTransform.dispW;
+    const effScale = bgTransform.baseScale * bgTransform.zoom * scaleRatio;
+    const destW = bgTransform.naturalW * effScale;
+    const destH = bgTransform.naturalH * effScale;
+    const destX = bgTransform.offsetX * scaleRatio;
+    const destY = bgTransform.offsetY * scaleRatio;
+    ctx.drawImage(bgImg, 0, 0, bgTransform.naturalW, bgTransform.naturalH, destX, destY, destW, destH);
     canvas.toBlob((blob) => resolve(blob), 'image/png');
   });
 }
