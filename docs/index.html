@@ -45,7 +45,9 @@ h1{font-size:20px;font-weight:700}
 .p-mt{font-size:13px;font-weight:700;color:#161823;line-height:1.35}
 .p-md{font-size:10px;color:rgba(22,24,35,.7);line-height:1.5}
 .p-ma{padding:14px 16px 17px;display:flex;flex-direction:column;align-items:center}
-.p-bo{display:block;width:100%;padding:10px 0;background:#fe2c55;color:#fff;font-size:12.5px;font-weight:700;border-radius:4px;text-align:center}
+.p-bo{display:block;width:100%;padding:10px 0;background:none;color:#fff;font-size:12.5px;font-weight:700;border:1.5px solid rgba(255,255,255,.55);border-radius:4px;text-align:center;position:relative;overflow:hidden}
+.p-bo::before{content:'';position:absolute;inset:0;background-image:var(--reveal-img);background-repeat:no-repeat;background-size:var(--reveal-size,cover);background-position:var(--reveal-pos,center);border-radius:inherit;z-index:0}
+.p-bo-label{position:relative;z-index:1;text-shadow:0 1px 4px rgba(0,0,0,.55)}
 .p-bl{display:block;width:100%;padding:9px 0 0;color:rgba(22,24,35,.55);font-size:11.5px;text-align:center}
 
 .rail{position:absolute;right:8px;bottom:62px;display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10}
@@ -194,7 +196,7 @@ input.missing{border-color:#fe2c55}
               <p class="p-md">アプリでさらに多くの動画と優れた機能をお楽しみください</p>
             </div>
             <div class="p-ma">
-              <div class="p-bo">TikTokを開く</div>
+              <div class="p-bo"><span class="p-bo-label">TikTokを開く</span></div>
               <div class="p-bl">後で</div>
             </div>
           </div>
@@ -394,7 +396,27 @@ function applyBgTransform() {
   bgImg.style.height = imgH + 'px';
   bgImg.style.left = bgTransform.offsetX + 'px';
   bgImg.style.top = bgTransform.offsetY + 'px';
+  updatePreviewCutout();
 }
+
+// 誘導ダイアログの「TikTokを開く」ボタン内側に、その位置に対応する背景画像の
+// 範囲だけを描画し、ボタンの中だけ背景が透けて見える(くり抜かれた)ように見せる
+const pBo = document.querySelector('.p-bo');
+const phoneEl = document.getElementById('phone');
+function updatePreviewCutout() {
+  if (!bgTransform.naturalW || !bgTransform.naturalH) return;
+  const phoneRect = phoneEl.getBoundingClientRect();
+  const boRect = pBo.getBoundingClientRect();
+  if (!boRect.width || !boRect.height) return;
+  const imgW = bgTransform.naturalW * bgTransform.baseScale * bgTransform.zoom;
+  const imgH = bgTransform.naturalH * bgTransform.baseScale * bgTransform.zoom;
+  const posX = bgTransform.offsetX - (boRect.left - phoneRect.left);
+  const posY = bgTransform.offsetY - (boRect.top - phoneRect.top);
+  pBo.style.setProperty('--reveal-img', 'url(' + bgImg.src + ')');
+  pBo.style.setProperty('--reveal-size', imgW + 'px ' + imgH + 'px');
+  pBo.style.setProperty('--reveal-pos', posX + 'px ' + posY + 'px');
+}
+window.addEventListener('resize', updatePreviewCutout);
 
 function snapAxis(offset, min, max) {
   const candidates = [0, min, max];
@@ -544,6 +566,7 @@ const floatToggle = document.getElementById('floatToggle');
 const floatPreview = document.getElementById('floatPreview');
 floatToggle.addEventListener('change', () => {
   floatPreview.classList.toggle('visible', floatToggle.checked);
+  requestAnimationFrame(updatePreviewCutout);
   saveState();
 });
 document.getElementById('previewIconArea').addEventListener('click', (e) => {
