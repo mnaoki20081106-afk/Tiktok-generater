@@ -542,39 +542,8 @@ bindFilePicker('iconInput', 'iconLabel', f => { state.icon = f; applyIconPreview
 // ===== 誘導ダイアログのプレビュー表示切り替え =====
 const floatToggle = document.getElementById('floatToggle');
 const floatPreview = document.getElementById('floatPreview');
-
-// 「TikTokを開く」ボタンの範囲をダイアログからくり抜き、実際のサイトと同様に
-// 背後の要素(背景画像やレール上のアイコンなど)が透けて見える見た目を再現する
-const pBo = document.querySelector('.p-bo');
-function updatePreviewHole() {
-  if (!floatPreview.classList.contains('visible')) return;
-  const ovRect = floatPreview.getBoundingClientRect();
-  const boRect = pBo.getBoundingClientRect();
-  const W = ovRect.width, H = ovRect.height;
-  let bw = boRect.width, bh = boRect.height;
-  if (!W || !H || !bw || !bh) return;
-  const pad = 1;
-  const r = 4 + pad;
-  const bx = boRect.left - ovRect.left - pad;
-  const by = boRect.top - ovRect.top - pad;
-  bw += pad * 2; bh += pad * 2;
-  const outer = `M0,0 H${W} V${H} H0 Z`;
-  const inner = `M${bx + r},${by}` +
-    ` H${bx + bw - r}` +
-    ` A${r},${r} 0 0 1 ${bx + bw},${by + r}` +
-    ` V${by + bh - r}` +
-    ` A${r},${r} 0 0 1 ${bx + bw - r},${by + bh}` +
-    ` H${bx + r}` +
-    ` A${r},${r} 0 0 1 ${bx},${by + bh - r}` +
-    ` V${by + r}` +
-    ` A${r},${r} 0 0 1 ${bx + r},${by} Z`;
-  floatPreview.style.clipPath = `path(evenodd, '${outer} ${inner}')`;
-}
-window.addEventListener('resize', updatePreviewHole);
-
 floatToggle.addEventListener('change', () => {
   floatPreview.classList.toggle('visible', floatToggle.checked);
-  if (floatToggle.checked) requestAnimationFrame(updatePreviewHole);
   saveState();
 });
 document.getElementById('previewIconArea').addEventListener('click', (e) => {
@@ -778,7 +747,6 @@ async function restoreState() {
     if (typeof saved.floatToggle === 'boolean') {
       floatToggle.checked = saved.floatToggle;
       floatPreview.classList.toggle('visible', saved.floatToggle);
-      if (saved.floatToggle) requestAnimationFrame(updatePreviewHole);
     }
   }
 
