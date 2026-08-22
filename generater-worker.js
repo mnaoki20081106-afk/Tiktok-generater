@@ -60,7 +60,17 @@ async function cfFetch(url, token, method='GET', body=null, contentType='applica
 async function handleDeploy(request, env) {
   let step = '初期化';
   try {
-    const form = await request.formData();
+    let form;
+    try {
+      form = await request.formData();
+    } catch (parseErr) {
+      const ct = request.headers.get('content-type') || '(なし)';
+      const cl = request.headers.get('content-length') || '(なし)';
+      throw new Error(
+        'リクエストの解析に失敗: ' + parseErr.message +
+        ' [Content-Type: ' + ct + ', Content-Length: ' + cl + ']'
+      );
+    }
     const workerName = form.get('workerName')?.trim().toLowerCase();
     const tiktokUrl  = form.get('tiktokUrl')?.trim();
     const title      = form.get('title')?.trim();
