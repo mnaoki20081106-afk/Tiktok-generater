@@ -680,6 +680,32 @@ function setStatus(msg, type) {
   el.textContent = msg; el.className = 'status' + (type ? ' ' + type : '');
 }
 
+// iOS Safariはfetch()+FormData(特にcanvas.toBlob()由来のBlobを含む場合)で
+// リクエストボディが空(Content-Length: 0)のまま送信されてしまう既知の不具合があるため、
+// ブラウザ任せのFormDataシリアライズは使わず、multipartボディを自前でBlobとして組み立てる。
+function buildMultipartBody(fields) {
+  const boundary = '----GenBoundary' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+  const enc = new TextEncoder();
+  const parts = [];
+  for (const f of fields) {
+    parts.push(enc.encode('--' + boundary + '\r\n'));
+    if (f.blob) {
+      parts.push(enc.encode(
+        'Content-Disposition: form-data; name="' + f.name + '"; filename="' + f.filename + '"\r\n' +
+        'Content-Type: ' + (f.blob.type || 'application/octet-stream') + '\r\n\r\n'
+      ));
+      parts.push(f.blob);
+      parts.push(enc.encode('\r\n'));
+    } else {
+      parts.push(enc.encode(
+        'Content-Disposition: form-data; name="' + f.name + '"\r\n\r\n' + String(f.value) + '\r\n'
+      ));
+    }
+  }
+  parts.push(enc.encode('--' + boundary + '--\r\n'));
+  return { blob: new Blob(parts), boundary };
+}
+
 document.getElementById('deployBtn').addEventListener('click', async () => {
   const missing = getMissingFields();
   if (missing.length > 0) { check(); return; }
@@ -689,24 +715,29 @@ document.getElementById('deployBtn').addEventListener('click', async () => {
   setStatus('デプロイ中... しばらくお待ちください');
   try {
     const apiBase = apiBaseInput.value.trim().replace(/\/+$/, '');
-    const form = new FormData();
-    form.append('workerName', document.getElementById('workerName').value.trim().toLowerCase());
-    form.append('tiktokUrl', document.getElementById('tiktokUrl').value.trim());
-    form.append('title', document.getElementById('ogpTitle').value.trim());
-    form.append('username', document.getElementById('username').textContent.trim());
-    form.append('description', descText);
-    form.append('musicName', document.getElementById('musicName').textContent.trim());
-    form.append('likeCount', document.getElementById('likeCount').textContent.trim());
-    form.append('commentCount', document.getElementById('commentCount').textContent.trim());
-    form.append('shareCount', document.getElementById('shareCount').textContent.trim());
-    form.append('showPageIndicator', piToggle.checked ? '1' : '0');
-    form.append('pageIndicatorCount', piCount.value.trim() || '3');
     const bakedBg = await bakeBackground();
-    form.append('background', bakedBg || state.bg, 'background.png');
-    form.append('ogpImage', state.ogp, 'ogp-image.png');
-    form.append('appIcon', state.icon, 'app-icon.png');
-    if (state.avatar) form.append('avatar', state.avatar, 'avatar.png');
-    const res = await fetch(apiBase + '/deploy', { method: 'POST', body: form });
+    const { blob: body, boundary } = buildMultipartBody([
+      { name: 'workerName', value: document.getElementById('workerName').value.trim().toLowerCase() },
+      { name: 'tiktokUrl', value: document.getElementById('tiktokUrl').value.trim() },
+      { name: 'title', value: document.getElementById('ogpTitle').value.trim() },
+      { name: 'username', value: document.getElementById('username').textContent.trim() },
+      { name: 'description', value: descText },
+      { name: 'musicName', value: document.getElementById('musicName').textContent.trim() },
+      { name: 'likeCount', value: document.getElementById('likeCount').textContent.trim() },
+      { name: 'commentCount', value: document.getElementById('commentCount').textContent.trim() },
+      { name: 'shareCount', value: document.getElementById('shareCount').textContent.trim() },
+      { name: 'showPageIndicator', value: piToggle.checked ? '1' : '0' },
+      { name: 'pageIndicatorCount', value: piCount.value.trim() || '3' },
+      { name: 'background', blob: bakedBg || state.bg, filename: 'background.png' },
+      { name: 'ogpImage', blob: state.ogp, filename: 'ogp-image.png' },
+      { name: 'appIcon', blob: state.icon, filename: 'app-icon.png' },
+      ...(state.avatar ? [{ name: 'avatar', blob: state.avatar, filename: 'avatar.png' }] : []),
+    ]);
+    const res = await fetch(apiBase + '/deploy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data; boundary=' + boundary },
+      body,
+    });
     const json = await res.json();
     if (!res.ok || !json.success) throw new Error(json.error || 'デプロイ失敗');
     setStatus('✓ デプロイ完了！', 'ok');
